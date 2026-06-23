@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>1 Remote Job</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
 :root{
   --bg:#e8e8e4;
@@ -586,11 +587,22 @@ let saveTimer = null;
 
 function uid(){ return 'id_' + Math.random().toString(36).slice(2,10); }
 
+// ---- Supabase config ----
+const SUPABASE_URL = 'https://zjnqftqhaxmxuhpmofus.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_2FHtDLxivpKAw2c8xohN-w_UfZyEY5Z';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const STATE_ROW_ID = 'main';
+
 async function loadState(){
   try{
-    const res = await window.storage.get('prospect-tracker-state');
-    if(res && res.value){ state = JSON.parse(res.value); }
-  }catch(e){ /* no existing data yet */ }
+    const { data, error } = await sb
+      .from('prospect_tracker_state')
+      .select('data')
+      .eq('id', STATE_ROW_ID)
+      .single();
+    if(error) throw error;
+    if(data && data.data){ state = data.data; }
+  }catch(e){ console.error('Load failed', e); }
   if(!state.prospects) state.prospects = [];
   if(!state.fromEmailHistory) state.fromEmailHistory = [];
   render();
@@ -599,8 +611,13 @@ async function loadState(){
 function scheduleSave(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async ()=>{
-    try{ await window.storage.set('prospect-tracker-state', JSON.stringify(state)); }
-    catch(e){ console.error('Save failed', e); }
+    try{
+      const { error } = await sb
+        .from('prospect_tracker_state')
+        .update({ data: state, updated_at: new Date().toISOString() })
+        .eq('id', STATE_ROW_ID);
+      if(error) throw error;
+    }catch(e){ console.error('Save failed', e); }
   }, 400);
 }
 
